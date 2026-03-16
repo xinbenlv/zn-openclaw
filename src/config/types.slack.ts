@@ -194,6 +194,21 @@ export type SlackAccountConfig = {
   ackReaction?: string;
   /** Reaction emoji added while processing a reply (e.g. "hourglass_flowing_sand"). Removed when done. Useful as a typing indicator fallback when assistant mode is not enabled. */
   typingReaction?: string;
+  /**
+   * Configuration for automatic AI response when the bot is added to a new channel.
+   * When enabled, the bot will trigger an AI run upon joining a channel, allowing
+   * it to greet users and ask about configuration preferences (e.g. requireMention,
+   * user allowlists) without requiring a manual first message.
+   */
+  onBotJoinChannel?: {
+    /** If true, trigger an AI response when the bot joins a new channel. Default: false. */
+    enabled?: boolean;
+    /**
+     * Custom prompt used to seed the AI response on join.
+     * Defaults to a greeting + configuration preference prompt.
+     */
+    prompt?: string;
+  };
 };
 
 export type SlackConfig = {

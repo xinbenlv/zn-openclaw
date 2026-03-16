@@ -1,9 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ResolvedSlackAccount } from "../../accounts.js";
 import { registerSlackMemberEvents } from "./members.js";
 import {
   createSlackSystemEventTestHarness as initSlackHarness,
   type SlackSystemEventTestOverrides as MemberOverrides,
 } from "./system-event-test-harness.js";
+
+const stubAccount: ResolvedSlackAccount = {
+  accountId: "default",
+  enabled: true,
+  botTokenSource: "config",
+  appTokenSource: "config",
+  userTokenSource: "none",
+  config: {},
+} as ResolvedSlackAccount;
 
 const memberMocks = vi.hoisted(() => ({
   enqueue: vi.fn(),
@@ -47,7 +57,11 @@ function getMemberHandlers(params: {
   if (params.shouldDropMismatchedSlackEvent) {
     harness.ctx.shouldDropMismatchedSlackEvent = params.shouldDropMismatchedSlackEvent;
   }
-  registerSlackMemberEvents({ ctx: harness.ctx, trackEvent: params.trackEvent });
+  registerSlackMemberEvents({
+    ctx: harness.ctx,
+    trackEvent: params.trackEvent,
+    account: stubAccount,
+  });
   return {
     joined: harness.getHandler("member_joined_channel") as MemberHandler | null,
     left: harness.getHandler("member_left_channel") as MemberHandler | null,

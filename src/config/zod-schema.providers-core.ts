@@ -901,6 +901,13 @@ export const SlackAccountSchema = z
     responsePrefix: z.string().optional(),
     ackReaction: z.string().optional(),
     typingReaction: z.string().optional(),
+    onBotJoinChannel: z
+      .object({
+        enabled: z.boolean().optional(),
+        prompt: z.string().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value) => {

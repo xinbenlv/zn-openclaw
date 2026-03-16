@@ -319,7 +319,7 @@ export async function prepareSlackMessage(params: {
   ctx: SlackMonitorContext;
   account: ResolvedSlackAccount;
   message: SlackMessageEvent;
-  opts: { source: "message" | "app_mention"; wasMentioned?: boolean };
+  opts: { source: "message" | "app_mention"; wasMentioned?: boolean; bypassUserAuth?: boolean };
 }): Promise<PreparedSlackMessage | null> {
   const { ctx, account, message, opts } = params;
   const cfg = ctx.cfg;
@@ -407,14 +407,16 @@ export async function prepareSlackMessage(params: {
   };
   const senderNameForAuth = ctx.allowNameMatching ? await resolveSenderName() : undefined;
 
-  const channelUserAuthorized = isRoom
-    ? resolveSlackUserAllowed({
-        allowList: channelConfig?.users,
-        userId: senderId,
-        userName: senderNameForAuth,
-        allowNameMatching: ctx.allowNameMatching,
-      })
-    : true;
+  const channelUserAuthorized = opts.bypassUserAuth
+    ? true
+    : isRoom
+      ? resolveSlackUserAllowed({
+          allowList: channelConfig?.users,
+          userId: senderId,
+          userName: senderNameForAuth,
+          allowNameMatching: ctx.allowNameMatching,
+        })
+      : true;
   if (isRoom && !channelUserAuthorized) {
     logVerbose(`Blocked unauthorized slack sender ${senderId} (not in channel users)`);
     return null;
