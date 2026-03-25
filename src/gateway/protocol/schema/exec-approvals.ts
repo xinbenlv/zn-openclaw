@@ -5,9 +5,19 @@ export const ExecApprovalsAllowlistEntrySchema = Type.Object(
   {
     id: Type.Optional(NonEmptyString),
     pattern: Type.String(),
+    args: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+    matchMode: Type.Optional(Type.Union([Type.Literal("path-only"), Type.Literal("exact")])),
     lastUsedAt: Type.Optional(Type.Integer({ minimum: 0 })),
     lastUsedCommand: Type.Optional(Type.String()),
     lastResolvedPath: Type.Optional(Type.String()),
+    createdAt: Type.Optional(Type.Integer({ minimum: 0 })),
+    createdFrom: Type.Optional(
+      Type.Union([
+        Type.Literal("allow-always"),
+        Type.Literal("manual"),
+        Type.Literal("rule-promotion"),
+      ]),
+    ),
   },
   { additionalProperties: false },
 );
@@ -91,6 +101,7 @@ export const ExecApprovalRequestParamsSchema = Type.Object(
   {
     id: Type.Optional(NonEmptyString),
     command: NonEmptyString,
+    commandArgv: Type.Optional(Type.Array(Type.String())),
     cwd: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     host: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     security: Type.Optional(Type.Union([Type.String(), Type.Null()])),

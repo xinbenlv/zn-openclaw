@@ -87,48 +87,72 @@ enum ExecApprovalDecision: String, Codable, Sendable {
 struct ExecAllowlistEntry: Codable, Hashable, Identifiable {
     var id: UUID
     var pattern: String
+    var args: [String]?
+    var matchMode: String?
     var lastUsedAt: Double?
     var lastUsedCommand: String?
     var lastResolvedPath: String?
+    var createdAt: Double?
+    var createdFrom: String?
 
     init(
         id: UUID = UUID(),
         pattern: String,
+        args: [String]? = nil,
+        matchMode: String? = nil,
         lastUsedAt: Double? = nil,
         lastUsedCommand: String? = nil,
-        lastResolvedPath: String? = nil)
+        lastResolvedPath: String? = nil,
+        createdAt: Double? = nil,
+        createdFrom: String? = nil)
     {
         self.id = id
         self.pattern = pattern
+        self.args = args
+        self.matchMode = matchMode
         self.lastUsedAt = lastUsedAt
         self.lastUsedCommand = lastUsedCommand
         self.lastResolvedPath = lastResolvedPath
+        self.createdAt = createdAt
+        self.createdFrom = createdFrom
     }
 
     private enum CodingKeys: String, CodingKey {
         case id
         case pattern
+        case args
+        case matchMode
         case lastUsedAt
         case lastUsedCommand
         case lastResolvedPath
+        case createdAt
+        case createdFrom
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         self.pattern = try container.decode(String.self, forKey: .pattern)
+        self.args = try container.decodeIfPresent([String].self, forKey: .args)
+        self.matchMode = try container.decodeIfPresent(String.self, forKey: .matchMode)
         self.lastUsedAt = try container.decodeIfPresent(Double.self, forKey: .lastUsedAt)
         self.lastUsedCommand = try container.decodeIfPresent(String.self, forKey: .lastUsedCommand)
         self.lastResolvedPath = try container.decodeIfPresent(String.self, forKey: .lastResolvedPath)
+        self.createdAt = try container.decodeIfPresent(Double.self, forKey: .createdAt)
+        self.createdFrom = try container.decodeIfPresent(String.self, forKey: .createdFrom)
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.id, forKey: .id)
         try container.encode(self.pattern, forKey: .pattern)
+        try container.encodeIfPresent(self.args, forKey: .args)
+        try container.encodeIfPresent(self.matchMode, forKey: .matchMode)
         try container.encodeIfPresent(self.lastUsedAt, forKey: .lastUsedAt)
         try container.encodeIfPresent(self.lastUsedCommand, forKey: .lastUsedCommand)
         try container.encodeIfPresent(self.lastResolvedPath, forKey: .lastResolvedPath)
+        try container.encodeIfPresent(self.createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(self.createdFrom, forKey: .createdFrom)
     }
 }
 
@@ -392,7 +416,7 @@ enum ExecApprovalsStore {
         }
     }
 
-    static func addAllowlistEntry(agentId: String?, pattern: String) {
+    static func addAllowlistEntry(agentId: String?, pattern: String, args: [String]? = nil) {
         let trimmed = pattern.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         self.updateFile { file in
@@ -400,8 +424,23 @@ enum ExecApprovalsStore {
             var agents = file.agents ?? [:]
             var entry = agents[key] ?? ExecApprovalsAgent()
             var allowlist = entry.allowlist ?? []
-            if allowlist.contains(where: { $0.pattern == trimmed }) { return }
-            allowlist.append(ExecAllowlistEntry(pattern: trimmed, lastUsedAt: Date().timeIntervalSince1970 * 1000))
+            // Dedup key includes args so distinct exact-match entries are preserved.
+            let effectiveArgs = args ?? []
+            let dedupKey = "\(trimmed)\0\(effectiveArgs)"
+            if allowlist.contains(where: {
+                let entryKey = $0.args != nil
+                    ? "\($0.pattern)\0\($0.args!)"
+                    : $0.pattern
+                return entryKey == dedupKey
+            }) { return }
+            let now = Date().timeIntervalSince1970 * 1000
+            allowlist.append(ExecAllowlistEntry(
+                pattern: trimmed,
+                args: args ?? [],
+                matchMode: "exact",
+                lastUsedAt: now,
+                createdAt: now,
+                createdFrom: "allow-always"))
             entry.allowlist = allowlist
             agents[key] = entry
             file.agents = agents
@@ -412,20 +451,33 @@ enum ExecApprovalsStore {
         agentId: String?,
         pattern: String,
         command: String,
-        resolvedPath: String?)
+        resolvedPath: String?,
+        args: [String]? = nil)
     {
         self.updateFile { file in
             let key = self.agentKey(agentId)
             var agents = file.agents ?? [:]
             var entry = agents[key] ?? ExecApprovalsAgent()
+            // Key by pattern+args identity so exact-match entries for the same
+            // binary but different args are updated independently.
+            let entryKey = args != nil
+                ? "\(pattern)\0\(args!)"
+                : pattern
             let allowlist = (entry.allowlist ?? []).map { item -> ExecAllowlistEntry in
-                guard item.pattern == pattern else { return item }
+                let itemKey = item.args != nil
+                    ? "\(item.pattern)\0\(item.args!)"
+                    : item.pattern
+                guard itemKey == entryKey else { return item }
                 return ExecAllowlistEntry(
                     id: item.id,
                     pattern: item.pattern,
+                    args: item.args,
+                    matchMode: item.matchMode,
                     lastUsedAt: Date().timeIntervalSince1970 * 1000,
                     lastUsedCommand: command,
-                    lastResolvedPath: resolvedPath)
+                    lastResolvedPath: resolvedPath,
+                    createdAt: item.createdAt,
+                    createdFrom: item.createdFrom)
             }
             entry.allowlist = allowlist
             agents[key] = entry
@@ -666,7 +718,11 @@ enum ExecApprovalHelpers {
 }
 
 enum ExecAllowlistMatcher {
-    static func match(entries: [ExecAllowlistEntry], resolution: ExecCommandResolution?) -> ExecAllowlistEntry? {
+    static func match(
+        entries: [ExecAllowlistEntry],
+        resolution: ExecCommandResolution?,
+        commandArgv: [String]? = nil
+    ) -> ExecAllowlistEntry? {
         guard let resolution, !entries.isEmpty else { return nil }
         let rawExecutable = resolution.rawExecutable
         let resolvedPath = resolution.resolvedPath
@@ -676,12 +732,22 @@ enum ExecAllowlistMatcher {
             let pattern = entry.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
             if pattern.isEmpty { continue }
             let hasPath = pattern.contains("/") || pattern.contains("~") || pattern.contains("\\")
+            var pathMatched = false
             if hasPath {
                 let target = resolvedPath ?? rawExecutable
-                if self.matches(pattern: pattern, target: target) { return entry }
-            } else if self.matches(pattern: pattern, target: executableName) {
-                return entry
+                pathMatched = self.matches(pattern: pattern, target: target)
+            } else {
+                pathMatched = self.matches(pattern: pattern, target: executableName)
             }
+            guard pathMatched else { continue }
+            // For exact-match entries, enforce element-by-element arg comparison.
+            if entry.matchMode == "exact", let entryArgs = entry.args {
+                let commandArgs = (commandArgv ?? []).dropFirst().map { $0 }
+                guard commandArgs.count == entryArgs.count else { continue }
+                let argsMatch = zip(entryArgs, commandArgs).allSatisfy { $0 == $1 }
+                guard argsMatch else { continue }
+            }
+            return entry
         }
         return nil
     }

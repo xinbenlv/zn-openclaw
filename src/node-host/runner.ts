@@ -1064,7 +1064,10 @@ async function handleInvoke(
       for (const segment of segments) {
         const pattern = segment.resolution?.resolvedPath ?? "";
         if (pattern) {
-          addAllowlistEntry(approvals.file, agentId, pattern);
+          // Capture the argument tail so exact-match entries prevent
+          // privilege escalation.
+          const args = segment.argv.length > 1 ? segment.argv.slice(1) : [];
+          addAllowlistEntry(approvals.file, agentId, pattern, args);
         }
       }
     }
@@ -1092,16 +1095,19 @@ async function handleInvoke(
   if (allowlistMatches.length > 0) {
     const seen = new Set<string>();
     for (const match of allowlistMatches) {
-      if (!match?.pattern || seen.has(match.pattern)) {
+      const matchKey =
+        match.args != null ? `${match.pattern}\0${JSON.stringify(match.args)}` : match.pattern;
+      if (!match?.pattern || seen.has(matchKey)) {
         continue;
       }
-      seen.add(match.pattern);
+      seen.add(matchKey);
       recordAllowlistUse(
         approvals.file,
         agentId,
         match,
         cmdText,
         segments[0]?.resolution?.resolvedPath,
+        segments[0]?.argv,
       );
     }
   }

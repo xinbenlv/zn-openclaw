@@ -19,9 +19,13 @@ export type ExecApprovalsDefaults = {
 export type ExecAllowlistEntry = {
   id?: string;
   pattern: string;
+  args?: string[] | null;
+  matchMode?: "path-only" | "exact";
   lastUsedAt?: number;
   lastUsedCommand?: string;
   lastResolvedPath?: string;
+  createdAt?: number;
+  createdFrom?: "allow-always" | "manual" | "rule-promotion";
 };
 
 export type ExecApprovalsAgent = ExecApprovalsDefaults & {
@@ -104,8 +108,12 @@ function mergeLegacyAgent(
   const allowlist: ExecAllowlistEntry[] = [];
   const seen = new Set<string>();
   const pushEntry = (entry: ExecAllowlistEntry) => {
-    const key = normalizeAllowlistPattern(entry.pattern);
-    if (!key || seen.has(key)) {
+    const patternKey = normalizeAllowlistPattern(entry.pattern);
+    if (!patternKey) {
+      return;
+    }
+    const key = entry.args != null ? `${patternKey}\0${JSON.stringify(entry.args)}` : patternKey;
+    if (seen.has(key)) {
       return;
     }
     seen.add(key);
@@ -582,6 +590,7 @@ function resolveAllowlistCandidatePath(
 export function matchAllowlist(
   entries: ExecAllowlistEntry[],
   resolution: CommandResolution | null,
+  effectiveArgv?: string[],
 ): ExecAllowlistEntry | null {
   if (!entries.length || !resolution?.resolvedPath) {
     return null;
@@ -596,9 +605,22 @@ export function matchAllowlist(
     if (!hasPath) {
       continue;
     }
-    if (matchesPattern(pattern, resolvedPath)) {
-      return entry;
+    if (!matchesPattern(pattern, resolvedPath)) {
+      continue;
     }
+    // For exact-match entries, enforce element-by-element arg comparison.
+    if (entry.matchMode === "exact" && entry.args != null) {
+      const commandArgs = effectiveArgv ? effectiveArgv.slice(1) : [];
+      const entryArgs = entry.args;
+      if (commandArgs.length !== entryArgs.length) {
+        continue;
+      }
+      const argsMatch = entryArgs.every((arg, i) => arg === commandArgs[i]);
+      if (!argsMatch) {
+        continue;
+      }
+    }
+    return entry;
   }
   return null;
 }
@@ -1134,7 +1156,7 @@ function evaluateSegments(
       candidatePath && segment.resolution
         ? { ...segment.resolution, resolvedPath: candidatePath }
         : segment.resolution;
-    const match = matchAllowlist(params.allowlist, candidateResolution);
+    const match = matchAllowlist(params.allowlist, candidateResolution, segment.argv);
     if (match) {
       matches.push(match);
     }
@@ -1420,22 +1442,34 @@ export function recordAllowlistUse(
   entry: ExecAllowlistEntry,
   command: string,
   resolvedPath?: string,
+  _commandArgv?: string[],
 ) {
   const target = agentId ?? DEFAULT_AGENT_ID;
   const agents = approvals.agents ?? {};
   const existing = agents[target] ?? {};
   const allowlist = Array.isArray(existing.allowlist) ? existing.allowlist : [];
-  const nextAllowlist = allowlist.map((item) =>
-    item.pattern === entry.pattern
-      ? {
-          ...item,
-          id: item.id ?? crypto.randomUUID(),
-          lastUsedAt: Date.now(),
-          lastUsedCommand: command,
-          lastResolvedPath: resolvedPath,
-        }
-      : item,
-  );
+  // Key by pattern+args identity so exact-match entries for the same binary
+  // but different args are updated independently.
+  const entryKey =
+    entry.args != null ? `${entry.pattern}\0${JSON.stringify(entry.args)}` : entry.pattern;
+  const nextAllowlist = allowlist.map((item) => {
+    const itemKey =
+      item.args != null ? `${item.pattern}\0${JSON.stringify(item.args)}` : item.pattern;
+    if (itemKey !== entryKey) {
+      return item;
+    }
+    return {
+      ...item,
+      id: item.id ?? crypto.randomUUID(),
+      args: item.args,
+      matchMode: item.matchMode,
+      createdAt: item.createdAt,
+      createdFrom: item.createdFrom,
+      lastUsedAt: Date.now(),
+      lastUsedCommand: command,
+      lastResolvedPath: resolvedPath,
+    };
+  });
   agents[target] = { ...existing, allowlist: nextAllowlist };
   approvals.agents = agents;
   saveExecApprovals(approvals);
@@ -1445,6 +1479,7 @@ export function addAllowlistEntry(
   approvals: ExecApprovalsFile,
   agentId: string | undefined,
   pattern: string,
+  args?: string[] | null,
 ) {
   const target = agentId ?? DEFAULT_AGENT_ID;
   const agents = approvals.agents ?? {};
@@ -1454,10 +1489,33 @@ export function addAllowlistEntry(
   if (!trimmed) {
     return;
   }
-  if (allowlist.some((entry) => entry.pattern === trimmed)) {
+  // Dedup key always includes args so `python3 foo.py` and `python3 bar.py`
+  // produce distinct entries, and bare `python3` is distinct from `python3 foo.py`.
+  const effectiveArgs = args ?? [];
+  const dedupKey = `${trimmed}\0${JSON.stringify(effectiveArgs)}`;
+  if (
+    allowlist.some((entry) => {
+      const entryKey =
+        entry.args != null ? `${entry.pattern}\0${JSON.stringify(entry.args)}` : entry.pattern;
+      return entryKey === dedupKey;
+    })
+  ) {
     return;
   }
-  allowlist.push({ id: crypto.randomUUID(), pattern: trimmed, lastUsedAt: Date.now() });
+  const now = Date.now();
+  // Always create exact-match entries from allow-always approvals.
+  // Use empty args array for bare commands so `python3` doesn't also
+  // match `python3 evil.py`.
+  const newEntry: ExecAllowlistEntry = {
+    id: crypto.randomUUID(),
+    pattern: trimmed,
+    args: args ?? [],
+    matchMode: "exact",
+    lastUsedAt: now,
+    createdAt: now,
+    createdFrom: "allow-always",
+  };
+  allowlist.push(newEntry);
   agents[target] = { ...existing, allowlist };
   approvals.agents = agents;
   saveExecApprovals(approvals);

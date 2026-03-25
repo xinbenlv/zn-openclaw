@@ -460,7 +460,7 @@ actor MacNodeRuntime {
             cwd: params.cwd,
             env: env)
         let allowlistMatch = security == .allowlist
-            ? ExecAllowlistMatcher.match(entries: approvals.allowlist, resolution: resolution)
+            ? ExecAllowlistMatcher.match(entries: approvals.allowlist, resolution: resolution, commandArgv: command)
             : nil
         let skillAllow: Bool
         if autoAllowSkills, let name = resolution?.executableName {
@@ -504,7 +504,14 @@ actor MacNodeRuntime {
         if persistAllowlist, security == .allowlist,
            let pattern = ExecApprovalHelpers.allowlistPattern(command: command, resolution: resolution)
         {
-            ExecApprovalsStore.addAllowlistEntry(agentId: agentId, pattern: pattern)
+            // Capture the argument tail so exact-match entries prevent privilege escalation.
+            let args: [String]? = command.count > 1
+                ? Array(command.dropFirst())
+                : []
+            ExecApprovalsStore.addAllowlistEntry(
+                agentId: agentId,
+                pattern: pattern,
+                args: args)
         }
 
         if security == .allowlist, allowlistMatch == nil, !skillAllow, !approvedByAsk {

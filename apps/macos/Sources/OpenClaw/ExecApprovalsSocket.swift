@@ -448,7 +448,8 @@ private enum ExecHostExecutor {
                 agentId: context.trimmedAgent,
                 pattern: match.pattern,
                 command: context.displayCommand,
-                resolvedPath: context.resolution?.resolvedPath)
+                resolvedPath: context.resolution?.resolvedPath,
+                args: match.args)
         }
 
         if let errorResponse = await self.ensureScreenRecordingAccess(request.needsScreenRecording) {
@@ -479,7 +480,7 @@ private enum ExecHostExecutor {
             cwd: request.cwd,
             env: env)
         let allowlistMatch = security == .allowlist
-            ? ExecAllowlistMatcher.match(entries: approvals.allowlist, resolution: resolution)
+            ? ExecAllowlistMatcher.match(entries: approvals.allowlist, resolution: resolution, commandArgv: command)
             : nil
         let skillAllow: Bool
         if autoAllowSkills, let name = resolution?.executableName {
@@ -513,7 +514,14 @@ private enum ExecHostExecutor {
         else {
             return
         }
-        ExecApprovalsStore.addAllowlistEntry(agentId: context.trimmedAgent, pattern: pattern)
+        // Capture the argument tail so exact-match entries prevent privilege escalation.
+        let args: [String]? = context.command.count > 1
+            ? Array(context.command.dropFirst())
+            : []
+        ExecApprovalsStore.addAllowlistEntry(
+            agentId: context.trimmedAgent,
+            pattern: pattern,
+            args: args)
     }
 
     private static func ensureScreenRecordingAccess(_ needsScreenRecording: Bool?) async -> ExecHostResponse? {
