@@ -223,6 +223,13 @@ export async function generateVoiceResponse(
     slashIndex === -1 ? agentRuntime.defaults.provider : modelRef.slice(0, slashIndex);
   const model = slashIndex === -1 ? modelRef : modelRef.slice(slashIndex + 1);
 
+  // Pin the session to the voice responseModel to prevent LiveSessionModelSwitchError
+  if (voiceConfig.responseModel && sessionEntry) {
+    (sessionEntry as Record<string, unknown>).providerOverride = provider;
+    (sessionEntry as Record<string, unknown>).modelOverride = model;
+    await agentRuntime.session.saveSessionStore(storePath, sessionStore);
+  }
+
   // Resolve thinking level
   const thinkLevel = agentRuntime.resolveThinkingDefault({ cfg, provider, model });
 
