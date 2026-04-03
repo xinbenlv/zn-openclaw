@@ -94,7 +94,7 @@ Before opening a new issue or PR, **search for existing issues and PRs** that ad
 - If an existing PR is open and directionally correct, consider reviewing it or offering to help iterate on it rather than opening a competing PR.
 - If you believe your approach is significantly better, open your PR with a clear explanation of _why_ — and **acknowledge the prior work**. Link to the existing issue/PR and credit the original author:
   - Mention "Related to #XXXX by @author" or "Builds on the approach in #XXXX" in your PR description.
-  - If your PR incorporates or duplicates ideas from a prior PR, add `Co-authored-by: Original Author <email>` to your commit message. This ensures they appear in GitHub's contributor graph.
+  - If your PR incorporates or duplicates ideas from a prior PR, add `Co-authored-by: Original Author <email>` to your commit message. This ensures they appear in GitHub's contributor graph. You can find the author's email from their original PR's commit history, or use `username@users.noreply.github.com` if their email is not public.
 
 ### For Maintainers: Credit and Contributor-First Practices
 
