@@ -4,6 +4,17 @@
 - In chat replies, file references must be repo-root relative only (example: `src/telegram/index.ts:80`); never absolute paths or `~/...`.
 - Do not edit files covered by security-focused `CODEOWNERS` rules unless a listed owner explicitly asked for the change or is already reviewing it with you. Treat those paths as restricted surfaces, not drive-by cleanup.
 
+## Carried Patches (CPQ)
+
+- This fork (`xinbenlv/openclaw`) uses a carried patch queue on top of upstream `openclaw/openclaw`.
+- Keep local deviations explicit, minimal, and easy to drop once upstream catches up.
+- Policy and invariants live in `docs/carried-patches.md`.
+- The live queue ledger lives in `docs/carried-patch-ledger.yaml`.
+- Repo-local operating workflow lives in `skills/github/openclaw-carried-patch-workflow/SKILL.md`.
+- `cpq-capstone-2` is the canonical metadata snapshot for the current carried queue.
+- Any mutation in `cpq-base..cpq-head` invalidates the old `cpq-capstone-2` and requires a rebuild last.
+- Never guess carried-patch naming or workflow from memory; read the repo-local CPQ skill first.
+
 ## Project Structure & Module Organization
 
 - Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).
