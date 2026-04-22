@@ -1,4 +1,4 @@
-# 🦞 OpenClaw — Personal AI Assistant
+# ZN-OPENCLAW
 
 <p align="center">
     <picture>
@@ -18,6 +18,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
+**ZN-OPENCLAW** is [my](https://zzn.im/?referrer=https://github.com/xinbenlv/openclaw) personal [OpenClaw](https://github.com/openclaw/openclaw) distro.
+
+It keeps the upstream OpenClaw core while carrying a small explicit downstream patch queue for local workflow, branding, and fork-specific improvements.
+
 **OpenClaw** is a _personal AI assistant_ you run on your own devices.
 It answers you on the channels you already use. It can speak and listen on macOS/iOS/Android, and can render a live Canvas you control. The Gateway is just the control plane — the product is the assistant.
 
@@ -32,6 +36,10 @@ New install? Start here: [Getting started](https://docs.openclaw.ai/start/gettin
 Preferred setup: run `openclaw onboard` in your terminal.
 OpenClaw Onboard guides you step by step through setting up the gateway, workspace, channels, and skills. It is the recommended CLI setup path and works on **macOS, Linux, and Windows (via WSL2; strongly recommended)**.
 Works with npm, pnpm, or bun.
+
+---
+
+ZN-OPENCLAW is maintained by [Zainan Victor Zhou](https://github.com/xinbenlv) as a downstream OpenClaw distro.
 
 ## Sponsors
 

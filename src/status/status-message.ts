@@ -828,6 +828,7 @@ export function buildStatusMessage(args: StatusArgs): string {
     : null;
   const commit = resolveCommitHash({ moduleUrl: import.meta.url });
   const versionLine = `🦞 OpenClaw ${VERSION}${commit ? ` (${commit})` : ""}`;
+  const forkLine = "📦 Fork: https://github.com/xinbenlv/zn-openclaw";
   const usagePair = formatUsagePair(inputTokens, outputTokens);
   const cacheLine = formatCacheLine(inputTokens, cacheRead, cacheWrite);
   const costLine = costLabel ? `💵 Cost: ${costLabel}` : null;
@@ -854,6 +855,7 @@ export function buildStatusMessage(args: StatusArgs): string {
     pluginStatusLine ? `🧩 ${pluginStatusLine}` : null,
     voiceLine,
     activationLine,
+    forkLine,
   ]
     .filter(Boolean)
     .join("\n");
