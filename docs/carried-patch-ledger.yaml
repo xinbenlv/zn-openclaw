@@ -1,1 +1,16 @@
-patches: []
+patches:
+  - id: cpq-cornerstone-0
+    current_commit: 939ffd13
+    upstream_pr: null
+
+  - id: cpq-cornerstone-1
+    current_commit: 8c1ee682
+    upstream_pr: null
+
+  - id: cpq-capstone-1
+    current_commit: 9b62c6c4
+    upstream_pr: null
+
+  - id: cpq-capstone-0
+    current_commit: cpq-head
+    upstream_pr: null
