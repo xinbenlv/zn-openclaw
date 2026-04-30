@@ -2,6 +2,16 @@
 
 Telegraph style. Root rules only. Read scoped `AGENTS.md` before touching a subtree.
 
+## Carried Patches (CPQ)
+
+- This fork (`xinbenlv/zn-openclaw`) uses a Carried Patch Queue on top of upstream `openclaw/openclaw`.
+- **Operational guidance, conventions, scripts, and templates all live in the canonical repo-cpq skill: https://github.com/xinbenlv/opc/tree/main/skills/repo-cpq**
+- Read that skill before mutating the queue or the fork. Do not guess CPQ naming or workflow from memory.
+- Local invariants:
+  - `upstream` remote = pristine `openclaw/openclaw`; `origin` = our fork.
+  - Policy pointer in `docs/carried-patches.md`. Live ledger in `docs/carried-patch-ledger.yaml`. Verifier in `scripts/cpq-checks.mjs`. Hooks in `git-hooks/`.
+  - `cpq-capstone-0` is the canonical metadata snapshot; `cpq-head` must point to it.
+
 ## Start
 
 - Repo: `https://github.com/openclaw/openclaw`
